@@ -7,6 +7,7 @@ const createContact = asyncHandler(async (req, res)=> {
     const {email, phoneNumber, name} = req.body;
 
     const foundContact = await Contact.findOne({email});
+
     if(foundContact){
         res.status(404);
         throw new Error(`User with ${foundContact.email} already exist in the database`)
@@ -20,7 +21,8 @@ const createContact = asyncHandler(async (req, res)=> {
     const contact = await Contact.create({
         name,
         email,
-        phoneNumber
+        phoneNumber,
+        user_id: req.user.id
     })
 
     res.status(201).json(contact);;
@@ -29,6 +31,11 @@ const createContact = asyncHandler(async (req, res)=> {
 const getContact = asyncHandler(async (req, res) => {
 
     const contact = await Contact.findById(req.params.id);
+
+    if(req.user.id !== contact.user_id.toString()){
+        res.status(400);
+        throw new Error("You don't have the right access");
+    }
 
     if(!contact) {
         res.status(404);
@@ -40,7 +47,19 @@ const getContact = asyncHandler(async (req, res) => {
 
 const getContacts = asyncHandler(async (req, res) => {
     
-    const contact = await Contact.find();
+    const contact = await Contact.find({user_id: req.user.id});
+
+    if(!contact){
+        res.status(401);
+        throw new Error(`User with ${req.user.id} does not exist`);
+    }
+
+    if(req.user.id !== contact.user_id.toString()){
+        res.status(403);
+        throw new Error("You don't have the right access");
+    }
+
+  
     res.status(200).json(contact);
 })
 
@@ -51,6 +70,11 @@ const putContact = asyncHandler(async (req, res) => {
     if(!foundContact){
         res.status(404);
         throw new Error("Contact not found");
+    }
+
+    if(req.user.id !== foundContact.user_id.toString()){
+        res.status(403);
+        throw new Error("You don't have the right access");
     }
 
     const updatedContact = await Contact.findByIdAndUpdate(
@@ -64,12 +88,19 @@ const putContact = asyncHandler(async (req, res) => {
 
 const delContact = asyncHandler(async (req, res) => {
 
-    const foundContact = await Contact.findByIdAndRemove(req.params.id);
+    const foundContact = await Contact.findById(req.params.id);
 
     if(!foundContact){
         res.status(404);
         throw new Error("Contact not found");
     }
+
+    if(req.user.id !== foundContact.user_id.toString()){
+        res.status(403);
+        throw new Error("You don't have the right access");
+    }
+
+    await Contact.deleteOne({_id: req.params.id})
 
     res.status(200).json(foundContact);
 })
